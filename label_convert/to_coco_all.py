@@ -40,9 +40,11 @@ def convert(img_home_dir, label_dir, output_dir, start=0, end=-1):
 
     # Loop over all image folders in available dirs
     for i, dir in enumerate(available_dirs[:end]):
-        if i < start:
+        if i < start:  # not using slicing to mantain index consistency in output
             continue
         print(f'\n[+]Converting {dir} ({i+1}/{len(available_dirs)})...')
+
+        # Generate path
         image_dir = os.path.join(img_home_dir, dir)
         label_path = os.path.join(label_dir, f'{dir}.json')
         output_folder_dir = os.path.join(output_dir, dir)
@@ -56,16 +58,17 @@ def convert(img_home_dir, label_dir, output_dir, start=0, end=-1):
 
         # Copy images
         try:
-            shutil.copytree(image_dir, os.path.join(
-                output_folder_dir, 'Images'))
+            shutil.copytree(image_dir,
+                            os.path.join(output_folder_dir, 'Images'))
         except FileExistsError:
             pass
 
-        # Convert bdd to coco
+        # Convert bdd labels into coco format using built-in converter
         os.system(f'python -m bdd100k.label.to_coco \
                     -m box_track -i {label_path} -o {temp_label_path}')
 
-        # Trim .json
+        # Trim the json file removes the 'xxx\\' so that BML can process it
+        # e.g., '123456\\123456-1.jpg' ==> '123456-1.jpg'
         with open(temp_label_path, 'r') as temp:
             with open(os.path.join(output_folder_dir, 'Annotations', 'coco_info.json'), 'w') as label_file:
                 label_file.write(temp.readline().replace(f'{dir}\\\\', ''))
@@ -73,7 +76,7 @@ def convert(img_home_dir, label_dir, output_dir, start=0, end=-1):
         # Remove temp label file
         os.remove(temp_label_path)
 
-        # Zip Images and Annotations folders
+        # Compress the folders
         zip_file = output_folder_dir + '.zip'
         with zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED) as zip:
             for dirname, _, filenames in os.walk(output_folder_dir):
